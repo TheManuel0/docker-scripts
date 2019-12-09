@@ -49,11 +49,11 @@ if [ $ser = "y" ]; then
 	echo " #### Port? Ex: 80:80 (Enter to skip and use default) #### "
 	read ser_port
 		if [ -z "$ser_port" ]; then
+			echo " #### Creating #### "
 			(docker-machine ssh Main-$n docker service create --name $ser_name --network Overlay-$n --replicas=$ser_rep $ser_img && exit) 1> /dev/null
-			echo " #### Creating #### "
 		else 
-			(docker-machine ssh Main-$n docker service create --name $ser_name --network $publish --replicas=$ser_rep --network Overlay-$n  $ser_img && exit) 1> /dev/null
 			echo " #### Creating #### "
+			(docker-machine ssh Main-$n docker service create --name $ser_name --network $publish --replicas=$ser_rep --network Overlay-$n  $ser_img && exit) 1> /dev/null
 		fi
 fi
 echo " #### Done #### "
