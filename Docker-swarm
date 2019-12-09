@@ -1,0 +1,63 @@
+#!/bin/bash
+c=0
+echo "#### Create a Swarm Host? y/n ####"
+read chost
+if [ $chost = y ]; then
+	echo "#### Which name should this set up have? ####"
+	read n
+	#Creates the docker container and makes it a host for swarm 
+	docker-machine create -d virtualbox Main-$n
+	docker-machine env Main-$n > LogsDocker$n
+	a="$(awk -F'[/:]' '/DOCKER_HOST/{print $4}' LogsDocker$n)"
+	join=$(docker-machine ssh Main-$n docker swarm init --advertise-addr $a && exit)
+	echo "$join" > docker-join$n
+	join=$(awk '/docker swarm join --/{print}' docker-join$n)
+
+elif [ $chost = n ]; then
+	echo "#### Enter the name of the Swarm host to edit Without "Main-" #### "
+	read n
+	docker-machine env Main-$n > LogsDocker$n
+        a="$(awk -F'[/:]' '/DOCKER_HOST/{print $4}' LogsDocker$n)"
+        join=$(docker-machine ssh Main-$n docker swarm join-token worker && exit)
+        echo "$join" > docker-join$n
+	join=$(awk '/docker swarm join --/{print}' docker-join$n)
+
+fi
+echo "#### Enter the number of de workers for this application ####"
+read a
+while [ $c -lt $a ]
+do
+	((c++))
+    docker-machine create -d virtualbox Worker-"$c"-for-"$n"
+	docker-machine env Worker-"$c"-for-"$n" >> LogsDocker$n
+	(docker-machine ssh Worker-"$c"-for-"$n" $join && exit)
+done
+echo "#### Set up overlay? y/n ####"
+read net
+if [ $net = "y" ]; then
+	(docker-machine ssh Main-$n docker network create -d overlay Overlay-$n && exit)
+fi
+echo "#### Set up service? y/n ####" 
+read ser
+if [ $ser = "y" ]; then
+	echo "#### Image? ####"
+	read ser_img
+	echo " #### Name? ####"
+	read ser_name
+	echo " #### Replicas (number)? #### " 
+	read ser_rep
+	echo " #### Port? Ex: 80:80 (Enter to skip and use default) #### "
+	read ser_port
+		if [ -z "$ser_port" ]; then
+			(docker-machine ssh Main-$n docker service create --name $ser_name --network Overlay-$n --replicas=$ser_rep $ser_img && exit) 1> /dev/null
+			echo " #### Creating #### "
+		else 
+			(docker-machine ssh Main-$n docker service create --name $ser_name --network $publish --replicas=$ser_rep --network Overlay-$n  $ser_img && exit) 1> /dev/null
+			echo " #### Creating #### "
+		fi
+fi
+echo " #### Done #### "
+sleep 5
+rm -rf docker-join$n LogsDocker$n
+echo "#### Workers created $a ####"
+docker-machine ls
