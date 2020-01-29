@@ -1,0 +1,74 @@
+#!/bin/bash
+
+clear
+echo "#### This script will stop a container if it spikes on usage on a selected unit ####"
+echo "#### Please select the unit to control ####"
+echo "		1 - RAM 
+		2 - CPU "
+read UNIT
+clear 
+case "$UNIT" in
+	1)
+		f=.MemPerc
+		;;
+	2)	
+		f=.CPUPerc
+		;;
+	*)
+		echo "#### Invalid input ####"
+		exit
+		;;
+esac
+echo " #### kill the process when script is closed? y/n ####"
+read PROC_KILL
+if [ $PROC_KILL = y ]; then
+		#kill docker stat in background when exited
+		trap 'kill -15 $f; exit 143' exit 2> /dev/null
+			
+fi
+#Loop for docker stats
+while true
+	do
+		h=0
+		docker stats  --no-stream --format "{{.Name}} {{$f}}" > dockerstat
+		mapfile -t container <dockerstat
+			for i in "${container[@]}"; do
+				CON_PERC_NEW[$h]=$(awk '{print int($2+0)}' <<< "${container[$h]}")
+				CON_NAME[$h]=$(awk '{print $1}' <<< "${container[$h]}")
+				((h++))
+				
+			done
+			sleep 1
+			docker stats  --no-stream --format "{{.Name}} {{$f}}" > dockerstat
+			mapfile -t container <dockerstat
+			g=0
+			for y in "${container[@]}"; do
+					CON_PERC_OLD[$g]=$(awk '{print int($2+0)}' <<< ="${container[$g]}")
+					((g++))
+			done
+
+		#aca van las cuentitas
+		for (( x=0 ; x < "${#CON_NAME[@]}"; x++ ))
+		do
+				if [[ ${CON_PERC_NEW[$x]} -gt 90 ]] || [[ $((${CON_PERC_NEW[$x]} - ${CON_PERC_OLD[$x]})) -gt 40 ]]; then 
+					((t[$x]++))
+					elif [[ ${CON_PERC_OLD[$x]} -lt 40 ]]; then 
+						t[$x]=0 
+				fi
+				if [[ ${t[$x]} -ge 5 ]]; then 
+					echo "docker stop" ${CON_NAME[$x]}
+				fi
+			
+		done
+done &
+
+echo "#### Running ####"
+
+awk 'BEGIN { FS = ":"} ; { print $2}' dockerstat
+if [ $PROC_KILL = y ]; then 
+			#wait for kill docker stat in background
+			f=$!
+			wait
+else echo " #### Remember to kill the process with ps aux | grep memoria -> kill 'PID' ####"
+fi
+
