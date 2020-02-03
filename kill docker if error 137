@@ -1,0 +1,21 @@
+#!/bin/bash
+
+asd=$(ps aux | grep -v "S+" | grep "S\|R" | grep "bash 1.sh" | awk '{print $2}' | wc -l)
+echo $asd
+if [[ -z "$asd" ]] || [[ "$asd" -gt "1" ]]
+  then
+    while true
+      do
+        a=$(docker ps -a | awk '/137/ {print $1}')
+        ## si container "a" esta parado por error 137, reiniciar
+        if [ ! -z "$a" ]
+          then
+            docker restart $a
+            echo "se reinicio el container $a, fallo por falta de memoria (error 137)"
+        fi
+        sleep 500
+    done &
+else
+  echo " #### Matando Script #### "
+  sudo  kill $asd
+fi
