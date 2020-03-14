@@ -1,3 +1,3 @@
 # Docker-scripts
-Various docker scripts i've made for practicing bash and python
+Various docker scripts i've made for practicing, made in bash
 
